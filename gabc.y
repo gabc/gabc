@@ -118,6 +118,17 @@ output(node *tree)
 		output(tree->right);
 
 	switch(tree->type){
+	case MINUS:
+		printf("pop %%eax\npop %%ebx\n");
+		printf("sub %%eax, %%ebx\n");
+		printf("push %%ebx\n");
+		break;
+	case TIMES:
+		printf("pop %%eax\n");
+		printf("pop %%ebx\n");
+		printf("imul %%eax, %%ebx\n");
+		printf("push %%ebx\n");
+		break;
 	case PLUS:
 		printf("pop %%eax\npop %%ebx\n");
 		printf("add %%eax, %%ebx\n");
