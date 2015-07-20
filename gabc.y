@@ -15,12 +15,13 @@
   void output(node *);
 
 #define YYSTYPE struct node *
+  int ifcmd;
   node *global;
 %}
 
 %start lines
 
-%token IF EQL FUN LBRAK RBRAK VAR
+%token IF EQL FUN LBRAK RBRAK VAR THEN
 %token	NUMBER
 %token	PLUS	MINUS	TIMES	DIVIDE	POWER
 %token	LEFT_PARENTHESIS	RIGHT_PARENTHESIS
@@ -50,6 +51,7 @@ cond	: IF LEFT_PARENTHESIS exp RIGHT_PARENTHESIS block  {$$ = mkif($3, $5, NULL)
         ;
 
 block	: LBRAK cmds RBRAK {$$ = $2;}
+	| LBRAK exp RBRAK {$$ = $2;}
 	;
 
 cmds	: cmds cmd {$$ = mknode($2, mknode($1, 0, "funcall", FUN), "funcall", FUN);}
@@ -101,7 +103,7 @@ mkif(node *test, node *then, node *elsse)
 {
 	node *new;
 
-	new = mknode(test, mknode(then, 0, "then", IF), "test", IF);
+	new = mknode(test, mknode(then, 0, "then", THEN), "test", IF);
 
 	return new;
 }
@@ -112,12 +114,24 @@ output(node *tree)
 	if(!tree)
 		return;
 
+	switch(tree->type){
+	case IF:
+		output(tree->left);
+		printf("jne .else\n");
+		output(tree->right);
+		printf(".else:\n");
+		return;
+	}
+
 	if(tree->left)
 		output(tree->left);
 	if(tree->right)
 		output(tree->right);
 
 	switch(tree->type){
+	case FUN:
+		printf("call %s\n", tree->token);
+		break;
 	case MINUS:
 		printf("pop %%eax\npop %%ebx\n");
 		printf("sub %%eax, %%ebx\n");
@@ -133,6 +147,11 @@ output(node *tree)
 		printf("pop %%eax\npop %%ebx\n");
 		printf("add %%eax, %%ebx\n");
 		printf("push %%ebx\n");
+		break;
+	case EQL:
+		printf("pop %%eax\npop %%ebx\n");
+		printf("cmp %%eax, %%ebx\n");
+		ifcmd = EQL;
 		break;
 	case NUMBER:
 		printf("push $%s\n", tree->token);
