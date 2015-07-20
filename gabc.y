@@ -12,6 +12,7 @@
   node *mknode(node *left, node *right, char *token, int type);
   node *mkif(node *test, node *then, node *elsse);
   node *mkfun(node *name, node *block);
+  node *mkfncall(node *, node *);
   void printtree(node *tree);
   void output(node *);
 
@@ -58,7 +59,7 @@ func	: FUN fun block {$$ = mkfun($2, $3);}
 block	: LBRAK cmds RBRAK {$$ = $2;}
 	;
 
-cmds	: cmds cmd {$$ = mknode($2, mknode($1, 0, "funcall", IDENT), "funcall", IDENT);}
+cmds	: cmds cmd {$$ = mkfncall($1, $2);}
 	| cmd	{$$ = $1;}
 	;
 
@@ -119,6 +120,14 @@ mkfun(node *fun, node *block)
 
 	new = mknode(block, 0, fun->token, FUN);
 
+	return new;
+}
+
+node *
+mkfncall(node *all, node *add)
+{
+	node *new;
+	new = mknode(0, all, add->token, IDENT);
 	return new;
 }
 
