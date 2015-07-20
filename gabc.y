@@ -11,6 +11,7 @@
   } node;
   node *mknode(node *left, node *right, char *token, int type);
   node *mkif(node *test, node *then, node *elsse);
+  node *mkfun(node *name, node *block);
   void printtree(node *tree);
   void output(node *);
 
@@ -21,7 +22,7 @@
 
 %start lines
 
-%token IF EQL FUN LBRAK RBRAK VAR THEN
+%token IF EQL FUN LBRAK RBRAK VAR THEN IDENT
 %token	NUMBER
 %token	PLUS	MINUS	TIMES	DIVIDE	POWER
 %token	LEFT_PARENTHESIS	RIGHT_PARENTHESIS
@@ -39,6 +40,7 @@ lines:  /* empty */
 line:   exp END		{ global = $1; return; }
 	| cond END	{ global = $1; return;}
 	| block END	{ global = $1; return;}
+	| func END	{ global = $1; return;}
 	;
 
 exp    : term             {$$ = $1;}
@@ -50,18 +52,21 @@ exp    : term             {$$ = $1;}
 cond	: IF LEFT_PARENTHESIS exp RIGHT_PARENTHESIS block  {$$ = mkif($3, $5, NULL);}
         ;
 
-block	: LBRAK cmds RBRAK {$$ = $2;}
-	| LBRAK exp RBRAK {$$ = $2;}
+func	: FUN fun block {$$ = mkfun($2, $3);}
 	;
 
-cmds	: cmds cmd {$$ = mknode($2, mknode($1, 0, "funcall", FUN), "funcall", FUN);}
+block	: LBRAK cmds RBRAK {$$ = $2;}
+	;
+
+cmds	: cmds cmd {$$ = mknode($2, mknode($1, 0, "funcall", IDENT), "funcall", IDENT);}
 	| cmd	{$$ = $1;}
 	;
 
 cmd	: fun END {$$ = $1;}
+	| exp END {$$ = $1;}
 	;
 
-fun	: FUN {$$ = mknode(0, 0, (char *)yylval, FUN);}
+fun	: IDENT  {$$ = mknode(0, 0, (char *)yylval, IDENT);}
 	;
 
 term   : factor           {$$ = $1;}
@@ -76,12 +81,11 @@ factor : NUMBER           {$$ = mknode(0,0,(char *)yylval, NUMBER);}
 
 int main (void) 
 {
-	printf(".text\n.globl main\nmain:\n");
+	printf(".text\n");
 	while(yyparse()){
 		//printtree(global);
 		output(global);
 	}
-	printf("mov $1, %%eax\nint $0x80\n");
 	return 0;
 }
 
@@ -108,6 +112,16 @@ mkif(node *test, node *then, node *elsse)
 	return new;
 }
 
+node *
+mkfun(node *fun, node *block)
+{
+	node *new;
+
+	new = mknode(block, 0, fun->token, FUN);
+
+	return new;
+}
+
 void
 output(node *tree)
 {
@@ -121,6 +135,11 @@ output(node *tree)
 		output(tree->right);
 		printf(".else:\n");
 		return;
+	case FUN:
+		printf(".globl %s\n", tree->token);
+		printf("%s:\n", tree->token);
+		output(tree->left);
+		return;
 	}
 
 	if(tree->left)
@@ -129,8 +148,11 @@ output(node *tree)
 		output(tree->right);
 
 	switch(tree->type){
-	case FUN:
-		printf("call %s\n", tree->token);
+	case IDENT:
+		if(strcmp(tree->token, "ret") == 0)
+			printf("pop %%ebx\nmov $1, %%eax\nint $0x80\n");
+		else
+			printf("call %s\n", tree->token);
 		break;
 	case MINUS:
 		printf("pop %%eax\npop %%ebx\n");

@@ -19,8 +19,9 @@
 "{"	 return(LBRAK);
 "}"	 return(RBRAK);
 "if"	 return(IF);
+"fun"	 return(FUN);
 \$[a-z]+ {yylval = (int)yytext; return(VAR);}
-[a-z]+	 {yylval = (int)yytext; return(FUN);}
+[a-z]+	 {yylval = (int)yytext; return(IDENT);}
 
 %%
 
