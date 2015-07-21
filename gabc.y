@@ -11,7 +11,7 @@
   } node;
   node *mknode(node *left, node *right, char *token, int type);
   node *mkif(node *test, node *then, node *elsse);
-  node *mkfun(node *name, node *block);
+  node *mkfun(node *, node *, node *);
   node *mkfncall(node *, node *, node *);
   node *mknil(void);
   void printtree(node *tree);
@@ -25,9 +25,9 @@
 %start lines
 
 %token IF EQL FUN LBRAK RBRAK VAR THEN IDENT
-%token	NUMBER NIL
+%token	NUMBER NIL ELSE SEP
 %token	PLUS	MINUS	TIMES	DIVIDE	POWER
-%token	LEFT_PARENTHESIS	RIGHT_PARENTHESIS
+%token	LPAR	RPAR
 %token	END
 
 %left	PLUS	MINUS
@@ -43,7 +43,6 @@ line:   exp END		{ global = $1; return; }
 	| cond END	{ global = $1; return;}
 	| block END	{ global = $1; return;}
 	| func END	{ global = $1; return;}
-	| t END		{ global = $1; return;}
 	;
 
 exp    : term             {$$ = $1;}
@@ -52,28 +51,31 @@ exp    : term             {$$ = $1;}
         | exp MINUS term    {$$ = mknode($1, $3, "-", MINUS);}
 	;
 
-cond	: IF LEFT_PARENTHESIS exp RIGHT_PARENTHESIS block  {$$ = mkif($3, $5, NULL);}
+cond	: IF LPAR exp RPAR block  {$$ = mkif($3, $5, NULL);}
+	| IF LPAR exp RPAR block ELSE block {$$ = mkif($3, $5, $7);}
         ;
 
-func	: FUN fun block {$$ = mkfun($2, $3);}
+func	: FUN fun LPAR args RPAR block {$$ = mkfun($2, $4, $6);}
 	;
 
 block	: LBRAK cmds RBRAK {$$ = $2;}
 	;
 
-t	: t cmd {$$ = mkfncall(0x0, $1, $2);}
-	| cmd {$$ = $1;}
+cmds	: cmd {$$ = $1;}
+	| cmds cmd {$$ = mkfncall($2->left, $1, $2);}
 	;
 
-cmds	: cmds cmd {$$ = mkfncall(0, $1, $2);}
-	| cmd {$$ = $1;}
-	;
-
-args	: exp {$$ = $1;}
+args	: args SEP exp {$$ = mknode($1, $3, "args", IDENT);}
+	| args SEP var {$$ = mknode($1, $3, "args", IDENT);}
+	| var	{$$ = $1;}
+	| exp	{$$ = $1;}
 	| /* nothing */ {$$ = mknil();}
 	;
 
-cmd	: fun LEFT_PARENTHESIS args RIGHT_PARENTHESIS END {$$ = mkfncall($3, 0, $1);}
+var	: VAR  {$$ = mknode(0, 0, (char *)yylval, VAR);}
+	;
+
+cmd	: fun LPAR args RPAR END {$$ = mkfncall($3, 0, $1);}
 	;
 
 fun	: IDENT  {$$ = mknode(0, 0, (char *)yylval, IDENT);}
@@ -85,7 +87,7 @@ term   : factor           {$$ = $1;}
         ;
 
 factor : NUMBER           {$$ = mknode(0,0,(char *)yylval, NUMBER);}
-        | LEFT_PARENTHESIS exp RIGHT_PARENTHESIS {$$ = $2;}
+        | LPAR exp RPAR {$$ = $2;}
         ;
 %%
 
@@ -93,8 +95,8 @@ int main (void)
 {
 	printf(".text\n");
 	while(yyparse()){
-		//printtree(global);
-		output(global);
+		printtree(global);
+		//output(global);
 	}
 	return 0;
 }
@@ -117,17 +119,17 @@ mkif(node *test, node *then, node *elsse)
 {
 	node *new;
 
-	new = mknode(test, mknode(then, 0, "then", THEN), "test", IF);
+	new = mknode(test, mknode(then, elsse ? mknode(elsse, 0, "else", ELSE) : 0, "then", THEN), "if", IF);
 
 	return new;
 }
 
 node *
-mkfun(node *fun, node *block)
+mkfun(node *fun, node *args,  node *block)
 {
 	node *new;
 
-	new = mknode(block, 0, fun->token, FUN);
+	new = mknode(args, block, fun->token, FUN);
 
 	return new;
 }

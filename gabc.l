@@ -13,13 +13,15 @@
 "*"      return(TIMES);
 "/"      return(DIVIDE);
 "^"      return(POWER);
-"("      return(LEFT_PARENTHESIS);
-")"      return(RIGHT_PARENTHESIS);
+"("      return(LPAR);
+")"      return(RPAR);
 ";"      return(END);
 "{"	 return(LBRAK);
 "}"	 return(RBRAK);
 "if"	 return(IF);
+"else"	 return(ELSE);
 "fun"	 return(FUN);
+","	 return(SEP);
 \$[a-z]+ {yylval = (int)yytext; return(VAR);}
 [a-z]+	 {yylval = (int)yytext; return(IDENT);}
 
