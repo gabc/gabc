@@ -12,7 +12,8 @@
   node *mknode(node *left, node *right, char *token, int type);
   node *mkif(node *test, node *then, node *elsse);
   node *mkfun(node *name, node *block);
-  node *mkfncall(node *, node *);
+  node *mkfncall(node *, node *, node *);
+  node *mknil(void);
   void printtree(node *tree);
   void output(node *);
 
@@ -24,7 +25,7 @@
 %start lines
 
 %token IF EQL FUN LBRAK RBRAK VAR THEN IDENT
-%token	NUMBER
+%token	NUMBER NIL
 %token	PLUS	MINUS	TIMES	DIVIDE	POWER
 %token	LEFT_PARENTHESIS	RIGHT_PARENTHESIS
 %token	END
@@ -42,6 +43,7 @@ line:   exp END		{ global = $1; return; }
 	| cond END	{ global = $1; return;}
 	| block END	{ global = $1; return;}
 	| func END	{ global = $1; return;}
+	| t END		{ global = $1; return;}
 	;
 
 exp    : term             {$$ = $1;}
@@ -59,12 +61,19 @@ func	: FUN fun block {$$ = mkfun($2, $3);}
 block	: LBRAK cmds RBRAK {$$ = $2;}
 	;
 
-cmds	: cmds cmd {$$ = mkfncall($1, $2);}
-	| cmd	{$$ = $1;}
+t	: t cmd {$$ = mkfncall(0x0, $1, $2);}
+	| cmd {$$ = $1;}
 	;
 
-cmd	: fun END {$$ = $1;}
-	| exp END {$$ = $1;}
+cmds	: cmds cmd {$$ = mkfncall(0, $1, $2);}
+	| cmd {$$ = $1;}
+	;
+
+args	: exp {$$ = $1;}
+	| /* nothing */ {$$ = mknil();}
+	;
+
+cmd	: fun LEFT_PARENTHESIS args RIGHT_PARENTHESIS END {$$ = mkfncall($3, 0, $1);}
 	;
 
 fun	: IDENT  {$$ = mknode(0, 0, (char *)yylval, IDENT);}
@@ -124,10 +133,18 @@ mkfun(node *fun, node *block)
 }
 
 node *
-mkfncall(node *all, node *add)
+mkfncall(node *args, node *rest, node *add)
 {
 	node *new;
-	new = mknode(0, all, add->token, IDENT);
+	new = mknode(args, rest, add->token, IDENT);
+	return new;
+}
+
+node *
+mknil(void)
+{
+	node *new;
+	new = mknode(0, 0, "nil", NIL);
 	return new;
 }
 
@@ -158,9 +175,10 @@ output(node *tree)
 
 	switch(tree->type){
 	case IDENT:
-		if(strcmp(tree->token, "ret") == 0)
-			printf("pop %%ebx\nmov $1, %%eax\nint $0x80\n");
-		else
+		if(strcmp(tree->token, "ret") == 0){
+			output(tree->left);
+			printf("mov $1, %%eax\nint $0x80\n");
+		}else
 			printf("call %s\n", tree->token);
 		break;
 	case MINUS:
@@ -212,6 +230,6 @@ void printtree(node *tree)
     printf(")");
 }
 
-int yyerror (char *s) {fprintf (stderr, "%s\n", s);}
+int yyerror (char *s) {fprintf (stderr, "Error: %s\n", s);}
 
 
