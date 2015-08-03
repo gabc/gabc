@@ -22,7 +22,7 @@
 "else"	 return(ELSE);
 "fun"	 return(FUN);
 ","	 return(SEP);
-\$[a-z]+ {yylval = (int)yytext; return(VAR);}
+\$[a-z]+ {yylval = (int)yytext; yylval++; return(VAR);} /* THIS IS WRONG But works.. */
 [a-z]+	 {yylval = (int)yytext; return(IDENT);}
 
 %%

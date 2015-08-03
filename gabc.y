@@ -15,8 +15,10 @@
   node *mkfncall(node *, node *, node *);
   node *mknil(void);
   void printtree(node *tree);
-  void output(node *);
 
+  void output(node *);
+  void outargs(node *);
+  void outblk(node *);
 #define YYSTYPE struct node *
   int ifcmd;
   node *global;
@@ -25,7 +27,7 @@
 %start lines
 
 %token IF EQL FUN LBRAK RBRAK VAR THEN IDENT
-%token	NUMBER NIL ELSE SEP
+%token	NUMBER NIL ELSE SEP ARGS FARGS
 %token	PLUS	MINUS	TIMES	DIVIDE	POWER
 %token	LPAR	RPAR
 %token	END
@@ -66,14 +68,15 @@ cmds	: cmd {$$ = $1;}
 	;
 
 /* We don't want function argument be number. */
-fargs	: args SEP var {$$ = mknode($1, $3, "fargs", IDENT);}
-	| var	{$$ = mknode($1, NULL, "fargs", IDENT);}
+fargs	: fargs SEP var {$$ = mknode($1, $3, "fargs", FARGS);}
+	| var	{$$ = mknode($1, NULL, "fargs", FARGS);}
+	| /* nothing */ {$$ = mknil();}
 	;
 
-args	: args SEP exp {$$ = mknode($1, $3, "args", IDENT);}
-	| args SEP var {$$ = mknode($1, $3, "args", IDENT);}
-	| var	{$$ = mknode($1, NULL, "args", IDENT);}
-	| exp	{$$ = mknode($1, NULL, "args", IDENT);} // May not be the right one.
+args	: args SEP exp {$$ = mknode($1, $3, "args", ARGS);}
+	| args SEP var {$$ = mknode($1, $3, "args", ARGS);}
+	| var	{$$ = mknode($1, NULL, "args", ARGS);}
+	| exp	{$$ = mknode($1, NULL, "args", ARGS);} // May not be the right one.
 	| /* nothing */ {$$ = mknil();}
 	;
 
@@ -100,10 +103,9 @@ factor  : NUMBER           {$$ = mknode(0,0,(char *)yylval, NUMBER);}
 int 
 main(void) 
 {
-	printf(".text\n");
 	while(yyparse()){
-		printtree(global);
-		//output(global);
+		//printtree(global);
+		output(global);
 	}
 	return 0;
 }
@@ -161,22 +163,10 @@ mknil(void)
 void
 output(node *tree)
 {
+	node *tmp;
+
 	if(!tree)
 		return;
-
-	switch(tree->type){
-	case IF:
-		output(tree->left);
-		printf("jne .else\n");
-		output(tree->right);
-		printf(".else:\n");
-		return;
-	case FUN:
-		printf(".globl %s\n", tree->token);
-		printf("%s:\n", tree->token);
-		output(tree->left);
-		return;
-	}
 
 	if(tree->left)
 		output(tree->left);
@@ -184,39 +174,38 @@ output(node *tree)
 		output(tree->right);
 
 	switch(tree->type){
-	case IDENT:
-		if(strcmp(tree->token, "ret") == 0){
-			output(tree->left);
-			printf("mov $1, %%eax\nint $0x80\n");
-		}else
-			printf("call %s\n", tree->token);
-		break;
-	case MINUS:
-		printf("pop %%eax\npop %%ebx\n");
-		printf("sub %%eax, %%ebx\n");
-		printf("push %%ebx\n");
-		break;
-	case TIMES:
-		printf("pop %%eax\n");
-		printf("pop %%ebx\n");
-		printf("imul %%eax, %%ebx\n");
-		printf("push %%ebx\n");
-		break;
-	case PLUS:
-		printf("pop %%eax\npop %%ebx\n");
-		printf("add %%eax, %%ebx\n");
-		printf("push %%ebx\n");
-		break;
-	case EQL:
-		printf("pop %%eax\npop %%ebx\n");
-		printf("cmp %%eax, %%ebx\n");
-		ifcmd = EQL;
-		break;
-	case NUMBER:
-		printf("push $%s\n", tree->token);
+	case FUN:
+		printf("int\n%s(", tree->token);
+		outargs(tree->left);
+		printf("\b)\n{\n");
+		outblk(tree->right);
+		printf("}\n");
 		break;
 	}
+}
 
+void
+outargs(node *tree)
+{
+	if(!tree)
+		return;
+	
+	if(tree->type == VAR)
+		printf("int %s,", tree->token);
+	outargs(tree->left);
+	outargs(tree->right);
+}
+
+void
+outblk(node *tree)
+{
+	if(!tree || tree->type == NIL)
+		return;
+
+	
+	printf("%s\n", tree->token);
+	outblk(tree->left);
+	outblk(tree->right);
 }
 
 void printtree(node *tree)
