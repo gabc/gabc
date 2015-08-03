@@ -18,6 +18,8 @@
 
   void output(node *);
   void outargs(node *);
+  void outexp(node *);
+  void outparam(node *);
   void outblk(node *);
 #define YYSTYPE struct node *
   int ifcmd;
@@ -100,6 +102,7 @@ factor  : NUMBER           {$$ = mknode(0,0,(char *)yylval, NUMBER);}
         ;
 %%
 
+	
 int 
 main(void) 
 {
@@ -168,10 +171,6 @@ output(node *tree)
 	if(!tree)
 		return;
 
-	if(tree->left)
-		output(tree->left);
-	if(tree->right)
-		output(tree->right);
 
 	switch(tree->type){
 	case FUN:
@@ -181,7 +180,29 @@ output(node *tree)
 		outblk(tree->right);
 		printf("}\n");
 		break;
+	case IF:
+		printf("if(");
+		outexp(tree->left);
+		printf("){\n");
+		outblk(tree->right); /* else ain't handled */
+		printf("}\n");
+		break;
 	}
+	if(tree->left)
+		output(tree->left);
+	if(tree->right)
+		output(tree->right);
+}
+
+void
+outexp(node *tree)
+{
+	if(!tree || tree->type == NIL)
+		return;
+
+	outexp(tree->left);
+	printf("%s", tree->token);
+	outexp(tree->right);
 }
 
 void
@@ -197,15 +218,28 @@ outargs(node *tree)
 }
 
 void
+outparam(node *tree)
+{
+	if(!tree || tree->type == NIL)
+		return;
+	
+	if(tree->type != ARGS)
+		printf("%s,", tree->token);
+	outparam(tree->left);
+	outparam(tree->right);
+}
+
+void
 outblk(node *tree)
 {
 	if(!tree || tree->type == NIL)
 		return;
 
-	
-	printf("%s\n", tree->token);
-	outblk(tree->left);
 	outblk(tree->right);
+
+	printf("%s(", tree->token);
+	outparam(tree->left);
+	printf("\b);\n");
 }
 
 void printtree(node *tree)
